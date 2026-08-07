@@ -1,0 +1,158 @@
+---
+title: Установка
+description: Docker или вручную, оба способа рабочие
+---
+
+
+Собрать образ Docker и не думать про версии Node или развернуть всё руками на сервере. Разницы в поведении нет, выбирайте по привычке.
+
+## Docker
+
+<Steps>
+<Step>
+
+### Забрать исходники
+
+```bash
+git clone https://github.com/MCXTeam/UnicoreCMS.git
+cd UnicoreCMS
+cp .env.example .env
+```
+
+</Step>
+
+<Step>
+
+### Заполнить `.env`
+
+Минимум, без чего не стартует: `BASEURL`, `API_BASEURL`, `DATABASE_NAME`, `JWT_KEY`. Плюс блок `MYSQL_*` — из него поднимется контейнер с базой.
+
+Обязательно поменяйте `JWT_KEY` и `ENCRYPTION_KEY`, значения из примера не годятся:
+
+```bash
+openssl rand -hex 32
+```
+
+Все переменные разобраны [на отдельной странице](/docs/start/env).
+
+</Step>
+
+<Step>
+
+### Поднять
+
+```bash
+docker compose --profile prod up -d --build
+```
+
+Первая сборка долгая, внутри ставятся зависимости всех четырёх пакетов и собираются оба фронта. Последующие занимают минуты.
+
+Профили в `docker-compose.yml`:
+
+| Профиль | Что поднимает |
+| --- | --- |
+| `prod` | Само приложение (все три процесса в одном контейнере) |
+| `nginx` | Реверс-прокси с раскладкой по доменам из `CLIENT_HOST`, `ADMIN_HOST`, `SERVER_HOST` |
+| `dev` | phpMyAdmin на `:8081` |
+
+MariaDB поднимается всегда, профиль ей не нужен.
+
+<Callout type="warn" title="Свой прокси уже есть">
+Если снаружи уже стоит nginx или Traefik, профиль `nginx` не включайте, иначе контейнер займёт порты 80 и 443. Проксируйте сразу на `CLIENT_PORT`, `ADMIN_PORT` и `BACKEND_PORT`.
+</Callout>
+
+</Step>
+
+<Step>
+
+### Создать таблицы
+
+```bash
+docker compose exec app pnpm run sync
+```
+
+Команда синхронизирует схему базы с сущностями. Дальше идёт [первый запуск](/docs/start/first-run).
+
+</Step>
+</Steps>
+
+## Вручную
+
+<Steps>
+<Step>
+
+### Node и pnpm
+
+Нужен Node 20–24, рекомендуется 22 (версия зафиксирована в `.nvmrc`). pnpm ставится через corepack:
+
+```bash
+corepack enable
+corepack prepare pnpm@9.15.9 --activate
+```
+
+</Step>
+
+<Step>
+
+### База данных
+
+Создайте базу и пользователя. Для MySQL/MariaDB:
+
+```sql
+CREATE DATABASE unicore CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'unicore'@'localhost' IDENTIFIED BY 'пароль';
+GRANT ALL PRIVILEGES ON unicore.* TO 'unicore'@'localhost';
+```
+
+Реквизиты положите в `DATABASE_*` в `.env`.
+
+</Step>
+
+<Step>
+
+### Зависимости, сборка, схема
+
+```bash
+cp .env.example .env
+# отредактировать .env
+pnpm run boot
+```
+
+`boot` прогоняет три шага подряд: `pnpm install`, сборку общего пакета и сервера, синхронизацию схемы базы. Фронты он не собирает, их соберите отдельно:
+
+```bash
+pnpm run build:client
+pnpm run build:admin
+```
+
+</Step>
+
+<Step>
+
+### Запуск
+
+```bash
+pnpm run start
+```
+
+Стартуют сразу три процесса. На проде запускайте их через pm2, в корне уже лежит `ecosystem.config.js`:
+
+```bash
+pm2 start ecosystem.config.js
+pm2 save
+```
+
+</Step>
+</Steps>
+
+## Разработка
+
+```bash
+pnpm run dev
+```
+
+Общий пакет собирается один раз, дальше поднимаются все три приложения в watch-режиме. Сервер слушает `:5000`, сайт `:3000`, админка `:4000`, если порты не переопределяли.
+
+<Callout title="Тестовые данные">
+Поставьте `DEV_SEED=1` в `.env` и выполните `pnpm run seed` — в базу насыпется 250 фейковых игроков, серверы, новости и подарки. На боевой базе так делать не надо.
+</Callout>

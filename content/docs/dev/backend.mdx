@@ -1,0 +1,129 @@
+---
+title: Бэкенд
+description: Модули NestJS, авторизация, права, интерсепторы
+---
+
+## Структура
+
+<Files>
+  <Folder name="src" defaultOpen>
+    <Folder name="admin">
+      <File name="users, roles, news, pages, email, config, api, webhook, locales, logs, dashboard" />
+    </Folder>
+    <Folder name="auth">
+      <File name="стратегии, гварды, декораторы, gravit" />
+    </Folder>
+    <Folder name="game">
+      <File name="servers, store, donate, cabinet, players" />
+    </Folder>
+    <Folder name="payment">
+      <File name="core + methods по провайдерам" />
+    </Folder>
+    <Folder name="cron">
+      <File name="фоновые задачи" />
+    </Folder>
+    <Folder name="events">
+      <File name="Socket.IO-шлюз" />
+    </Folder>
+    <Folder name="cli">
+      <File name="консольные команды" />
+    </Folder>
+    <Folder name="common">
+      <File name="константы, фильтры, декораторы, хранилище" />
+    </Folder>
+    <File name="main.ts" />
+    <File name="app.module.ts" />
+    <File name="ormconfig.ts" />
+  </Folder>
+</Files>
+
+Все модули собраны одинаково: `*.module.ts`, `*.controller.ts`, `*.service.ts`, папки `entities`, `dto`, `enums`. Ищете, где живёт какая-то ручка, — берите имя из URL, по нему найдётся контроллер.
+
+## Что настраивается в `main.ts`
+
+Порядок вызовов здесь важен:
+
+```ts
+app.set('trust proxy', envConfig.trustProxy)
+app.enableCors({ origin: envConfig.corsOrigins, credentials: true })
+app.useStaticAssets(join(__dirname, '../../../storage'))
+app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true }))
+app.useWebSocketAdapter(new AuthAdapter(app))
+app.useGlobalInterceptors(
+  new ClassSerializerInterceptor(app.get(Reflector)),
+  new ContentLocaleInterceptor(...),
+)
+```
+
+<Callout type="warn" title="Интерсепторы: сериализация перед локализацией">
+`ClassSerializerInterceptor` должен идти первым. Он превращает сущности в plain-объекты, а `ContentLocaleInterceptor` уже подменяет в них текстовые поля переводами. Поменяете местами — переводы будут накладываться на объект, который потом пересоберётся, и пропадут.
+</Callout>
+
+С `whitelist: true` в `ValidationPipe` поля, не описанные в DTO, молча вырезаются из тела запроса. Добавили поле в DTO, но забыли декоратор валидации — до сервиса оно не доедет. Проверяйте это первым делом, когда «значение не сохраняется».
+
+Swagger включается только вне production и висит на `/docs`.
+
+## Авторизация
+
+Две стратегии Passport под одним гвардом:
+
+```ts
+export class JwtAuthGuard extends AuthGuard(['jwt', 'headerapikey']) {}
+```
+
+По **JWT** ходят обычные пользователи. Access-токен короткий, refresh длинный, оба настраиваются в `.env`. Токены привязаны к сессии, так что закрытая из кабинета сессия убивает и refresh.
+
+**API-ключ** выдаётся машинным клиентам: плагину на сервере, лаунчеру. Заголовок:
+
+```http
+Authorization: Api-Key <секрет>
+```
+
+Вместе с ключом проверяется список разрешённых IP (маски поддерживаются), и только потом его права подставляются служебному аккаунту. Ключ без списка IP не работает вообще, и сделано это намеренно.
+
+`@Public()` снимает требование авторизации с конкретной ручки.
+
+## Права
+
+Гвард `PermissionGuard` читает метаданные декоратора `@Permissions([...])`. Логика внутри:
+
+1. Суперпользователь проходит сразу.
+2. Собираются права из ролей (по возрастанию приоритета), потом персональные, потом накладные от купленного доната.
+3. Маски раскрываются: `admin.users.*` покрывает и саму ветку, и всё под ней.
+4. Права с `!` вычитаются из совпавших, и так на любом шаге.
+5. По умолчанию нужны **все** перечисленные права. `{ or: true }` меняет на «хотя бы одно».
+
+Декоратор умеет подставлять значения из запроса:
+
+```ts
+@Permissions([[Permission.SomethingWithServer], {
+  handle: (req) => ({ server: req.params.server }),
+}])
+```
+
+Тогда `%server%` в строке права заменится на реальный ID сервера.
+
+## Фоновые задачи
+
+Всё в `src/cron/tasks`, на `@nestjs/schedule`:
+
+| Задача | Период | Что делает |
+| --- | --- | --- |
+| `online` | 5 сек | Опрос Query, обновление онлайна и рекордов |
+| `rcon` | 5 сек | Разбор очереди команд |
+| `ban` | 10 мин | Снятие истёкших банов |
+| `donate` | 10 мин | Снятие истёкших привилегий и прав |
+| `votes` | 30 мин | Подведение месячных итогов голосований |
+| `cart`, `email`, `history`, `payment-cleaner`, `referals`, `tokens` | 1 час | Чистка и начисления |
+
+## Вебсокеты
+
+Шлюз один, `EventsGateway`. Подключение авторизуется так же, как HTTP, через `AuthAdapter`. Клиенты раскладываются по комнатам: своя у пользователей, своя у API-ключей (`api-key:<секрет>`), своя у прав вроде `kernel.unicore.connect`.
+
+Так события уходят точно тем, кому положено. Снятие привилегии летит в комнату плагина, обновление онлайна уходит всем.
+
+## Логи
+
+Логгер общий, из `unicore-common`, на winston. Пишется HTTP-доступ (метод, адрес, статус, IP), ошибки вебхуков, отказы RCON. Чувствительные значения маскируются, так что токены и пароли в логи не попадают.
+
+Файлы складываются в папку `logs` в корне репозитория. В Docker она смонтирована наружу, так что смотреть можно с хоста.

@@ -1,0 +1,101 @@
+---
+title: Лаунчер
+description: Интеграция с GravitLauncher и отдача скинов
+---
+
+Сайт умеет работать сервисом авторизации для **GravitLauncher**. Игрок вводит логин и пароль от сайта, лаунчер спрашивает у нас, кто это, и получает сессию для входа на сервер.
+
+Со стороны лаунчера этим занимается модуль **UnicoreProvider**, со стороны сайта работают ручки под `/auth/gravit`.
+
+## Подключение
+
+<Steps>
+<Step>
+
+### Выпустить ключ
+
+**Утилиты → API-ключи → Создать**, право `kernel.unicore.provider`, в разрешённые адреса — IP машины, где стоит LaunchServer.
+
+</Step>
+
+<Step>
+
+### Настроить UnicoreProvider
+
+В конфиге LaunchServer пропишите базовый адрес API и выпущенный ключ. Ключ уходит в заголовке `Authorization: Api-Key …`, как у всех остальных машинных клиентов.
+
+</Step>
+
+<Step>
+
+### Проверить
+
+```bash
+curl https://api.example.com/auth/gravit/ping \
+  -H 'Authorization: Api-Key ваш-ключ'
+```
+
+Если в ответе пришли данные служебного пользователя, ключ и адрес приняты.
+
+</Step>
+</Steps>
+
+## Ручки
+
+Все требуют право `kernel.unicore.provider`.
+
+| Метод | Путь | Что делает |
+| --- | --- | --- |
+| `GET` | `/auth/gravit/ping` | Проверка связи |
+| `GET` | `/auth/gravit/getAuthDetails` | Какие способы входа поддерживаются |
+| `GET` | `/auth/gravit/getUserByUsername/:username` | Найти по нику или почте |
+| `GET` | `/auth/gravit/getUserByUUID/:uuid` | Найти по UUID |
+| `GET` | `/auth/gravit/getUserByToken` | Кто владелец access-токена |
+| `POST` | `/auth/gravit/authorize` | Вход по паролю (и TOTP) |
+| `POST` | `/auth/gravit/refreshToken` | Обновить токен |
+| `POST` | `/auth/gravit/deleteSession` | Закрыть сессию |
+| `POST` | `/auth/gravit/exitUser` | Выйти со всех устройств |
+| `POST` | `/auth/gravit/checkServer` | Проверка входа на сервер |
+| `POST` | `/auth/gravit/joinServer` | Регистрация входа на сервер |
+
+`getAuthDetails` отвечает, что поддерживаются `password` и `totp`. По этому ответу лаунчер решает, спрашивать ли второй фактор.
+
+## Ошибки
+
+Вместо обычных сообщений здесь возвращаются свои коды. Лаунчер их ждёт и показывает игроку понятный текст:
+
+| Код | Когда |
+| --- | --- |
+| `auth.usernotfound` | Такого игрока нет |
+| `auth.wrongpassword` | Неверный пароль |
+| `auth.require2fa` | Нужен код двухфакторки |
+| `auth.userblocked` | Аккаунт заблокирован |
+| `auth.expiretoken` | Токен просрочен |
+| `auth.invalidtoken` | Токен битый |
+
+<Callout title="Неактивированные аккаунты">
+Если в настройках включено обязательное подтверждение почты, игрок без подтверждения не должен попадать на сервер. Проверяйте это на стороне сервера. Сессия сама по себе ещё не значит, что аккаунт активирован.
+</Callout>
+
+## Скины и плащи
+
+Отдаются публично, без авторизации, потому что лаунчеру и скин-рендерам они нужны без токена:
+
+| Путь | Что отдаёт |
+| --- | --- |
+| `/cabinet/skin/public/skin/username/:username` | Скин по нику |
+| `/cabinet/skin/public/skin/uuid/:uuid` | Скин по UUID |
+| `/cabinet/skin/public/cloak/username/:username` | Плащ по нику |
+| `/cabinet/skin/public/cloak/uuid/:uuid` | Плащ по UUID |
+
+Файлы лежат в папке `storage`, сервер раздаёт их статикой. Загружает их игрок сам из кабинета, если у него есть право `user.cabinet.skin`. HD-версии открывает отдельное право, его обычно продают.
+
+## Публичные профили
+
+| Путь | Что отдаёт |
+| --- | --- |
+| `/users/public/username/:username` | Профиль по нику |
+| `/users/public/uuid/:uuid` | Профиль по UUID |
+| `/users/public/user/:username` | Расширенный публичный профиль |
+
+Наружу уходит только безопасное подмножество полей. Ни почты, ни балансов, ни служебных флагов там нет.

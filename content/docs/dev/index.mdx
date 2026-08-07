@@ -1,0 +1,107 @@
+---
+title: Структура проекта
+description: Монорепо, четыре пакета, кто от кого зависит
+---
+
+Репозиторий устроен как pnpm-монорепо из четырёх пакетов: три приложения и один общий пакет между ними.
+
+<Files>
+  <Folder name="UnicoreCMS" defaultOpen>
+    <Folder name="workspaces" defaultOpen>
+      <Folder name="common">
+        <File name="unicore-common — конфиг, константы, права, утилиты" />
+      </Folder>
+      <Folder name="server">
+        <File name="unicore-server — NestJS + TypeORM" />
+      </Folder>
+      <Folder name="client">
+        <File name="unicore-client — Nuxt 3, публичный сайт" />
+      </Folder>
+      <Folder name="admin">
+        <File name="unicore-admin — Nuxt 3 + PrimeVue, панель" />
+      </Folder>
+    </Folder>
+    <Folder name="docker">
+      <File name="nginx" />
+      <File name="node" />
+    </Folder>
+    <Folder name="storage">
+      <File name="Загруженные файлы" />
+    </Folder>
+    <File name=".env" />
+    <File name="ecosystem.config.js" />
+    <File name="docker-compose.yml" />
+  </Folder>
+</Files>
+
+## Стек
+
+| Часть | На чём |
+| --- | --- |
+| Сервер | NestJS 11, TypeORM 0.3, Express, Socket.IO |
+| Фронты | Nuxt 3, Vue 3, PrimeVue 4 |
+| База | MySQL / MariaDB / PostgreSQL |
+| Пакетный менеджер | pnpm 9, Node 20–24 |
+| Общий пакет | TypeScript, сборка через tsup |
+
+## `unicore-common`
+
+Здесь живёт всё, что нужно больше чем одному приложению. Не копируется, а импортируется.
+
+| Модуль | Что внутри |
+| --- | --- |
+| `envconfig` | Разбор `.env` с валидацией. Единственное место, где читаются переменные |
+| `ports` | Логика выбора портов и поиска `.env` |
+| `constants` | Общие константы, дефолты, ключи |
+| `enums` | Права (`Permission`), события |
+| `issuance` | Пресеты команд RCON, плейсхолдеры, шаблонизатор |
+| `locales` | Коды языков, имена кук и заголовков |
+| `permissions` | Раскрытие масок прав |
+| `validation` | Свои правила class-validator |
+| `sanitize` | Очистка HTML |
+| `duration` | Форматирование сроков с русской плюрализацией |
+| `public-config` | То из конфига, что можно отдавать в браузер |
+
+Пакет собирается в CJS и ESM сразу: сервер работает на CommonJS, а Nuxt на модулях. Экспорты разложены по подпутям (`unicore-common/issuance`, `unicore-common/ports`), чтобы фронт не тащил в бандл серверные зависимости.
+
+<Callout type="warn" title="Правило единственного источника">
+Константу или тип, который нужен двум приложениям, кладите в `common`, а не дублируйте. Список платёжных провайдеров, набор статусов, имена кук уже лежат там. Скопированное значение обязательно разъедется, вопрос только когда.
+</Callout>
+
+## Как что запускать
+
+```bash
+pnpm run dev          # всё сразу в watch
+pnpm run build        # прод-сборка всех пакетов
+pnpm run build:server # только common + server
+pnpm run build:client
+pnpm run build:admin
+pnpm run sync         # синхронизация схемы БД
+pnpm run seed         # демо-данные
+pnpm run lint
+pnpm run format
+```
+
+Команда `pnpm run boot` делает установку, сборку сервера и синхронизацию схемы за один заход. Удобно при первом развёртывании.
+
+<Callout title="Общий пакет собирается первым">
+`dev` и `build:server` сначала собирают `unicore-common`. Если этого не сделать, TypeScript будет ругаться на несуществующие типы, ведь появляются они только после сборки.
+</Callout>
+
+## Порты
+
+| Приложение | Порт по умолчанию | Переменная |
+| --- | --- | --- |
+| Сайт | 3000 | `CLIENT_PORT` |
+| Админка | 4000 | `ADMIN_PORT` |
+| API | 5000 | `BACKEND_PORT` |
+
+Порт из `.env` приоритетнее переменной окружения, потому что игровые панели инжектят свой `SERVER_PORT`. Фронты стартуют через `start.mjs`, который читает порт тем же кодом, что и сервер, чтобы значение везде совпадало.
+
+## Куда смотреть дальше
+
+- [Сервер](/docs/dev/backend) — модули, гварды, интерсепторы
+- [Фронтенд](/docs/dev/frontend) — как устроены Nuxt-приложения
+- [База данных](/docs/dev/database) — сущности и синхронизация схемы
+- [Локализация](/docs/dev/i18n) — как добавить переводимое поле
+- [Сборка и деплой](/docs/dev/build) — что происходит при `pnpm run build`

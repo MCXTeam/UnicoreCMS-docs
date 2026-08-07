@@ -1,0 +1,21 @@
+{
+  "root": true,
+  "title": "Админу проекта",
+  "description": "Всё, что настраивается через панель",
+  "icon": "SlidersHorizontal",
+  "pages": [
+    "index",
+    "settings",
+    "users",
+    "roles",
+    "servers",
+    "store",
+    "donate",
+    "issuance",
+    "payments",
+    "bonuses",
+    "content",
+    "locales",
+    "webhooks"
+  ]
+}

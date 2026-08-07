@@ -1,0 +1,7 @@
+{
+  "root": true,
+  "title": "Разработчику",
+  "description": "Как устроен код и как в нём работать",
+  "icon": "Code",
+  "pages": ["index", "backend", "frontend", "database", "i18n", "build"]
+}

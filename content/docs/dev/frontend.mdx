@@ -1,0 +1,142 @@
+---
+title: Клиент и админка
+description: Два приложения на Nuxt 3, что у них общего и чем они отличаются
+---
+
+Оба фронта работают на Nuxt 3 с SSR. Клиент собран на PrimeVue и собственных стилях, админка — на PrimeVue-шаблоне. Кода они между собой не делят: общее уезжает в `unicore-common`, остальное живёт своей жизнью.
+
+## Раскладка
+
+<Files>
+  <Folder name="client" defaultOpen>
+    <Folder name="pages">
+      <File name="маршруты по файловой системе" />
+    </Folder>
+    <Folder name="components" />
+    <Folder name="composables">
+      <File name="useLocale.ts" />
+    </Folder>
+    <Folder name="plugins">
+      <File name="api.ts, i18n.ts, auth.client.ts, socket.client.ts…" />
+    </Folder>
+    <Folder name="stores">
+      <File name="auth, config, io, ui — Pinia" />
+    </Folder>
+    <Folder name="middleware">
+      <File name="auth, guest, verify" />
+    </Folder>
+    <File name="nuxt.config.ts" />
+    <File name="load-env.ts" />
+    <File name="start.mjs" />
+  </Folder>
+</Files>
+
+## Конфигурация
+
+`load-env.ts` подключается первой строкой `nuxt.config.ts` и подтягивает `.env` из корня монорепо. Дальше значения берутся не напрямую, а через `unicore-common/public-config`. Он отдаёт только то, что безопасно показать в браузере.
+
+```ts
+import './load-env'
+import { publicConfig } from 'unicore-common/public-config'
+
+export default defineNuxtConfig({
+  devServer: { port: publicConfig.frontendPort, host: '0.0.0.0' },
+  runtimeConfig: {
+    public: {
+      apiBaseurl: publicConfig.apiBaseurl,
+      baseurl: publicConfig.baseurl,
+    },
+  },
+})
+```
+
+<Callout type="warn" title="Не импортируйте `envconfig` во фронте">
+`unicore-common/envconfig` содержит секреты: ключи платёжек, пароль базы, JWT-ключ. Для фронта есть `public-config`, где остались только публичные значения. Один неаккуратный импорт — и секреты уезжают в бандл.
+</Callout>
+
+## HTTP-клиент
+
+Плагин `api.ts` создаёт axios-инстанс и вешает на него три вещи:
+
+- **Токен.** Access-токен из Pinia-стора в заголовок `Authorization`.
+- **Таймзона и язык.** Заголовки `Timezone` и `x-locale` в каждом запросе.
+- **Обновление токена.** На 401 запрос ставится на паузу, дёргается refresh, запрос повторяется. Несколько параллельных 401 ждут одного общего обновления, а не делают по своему.
+
+Если refresh не сработал, пользователь разлогинивается и уезжает на `/auth`.
+
+## Аутентификация
+
+Токены живут в Pinia-сторе `auth` и переживают перезагрузку. Три middleware:
+
+| Middleware | Кого пускает |
+| --- | --- |
+| `auth` | Только вошедших |
+| `guest` | Только гостей, страницы логина и регистрации |
+| `verify` | Только с подтверждённой почтой |
+
+## Локализация
+
+`plugins/i18n.ts` при старте забирает список языков и словарь с сервера, кладёт в `useState` и отдаёт наружу два хелпера:
+
+```ts
+$t('cabinet.balance')
+$t('cabinet.left_days', { days: 12 })
+$setLocale('en')
+```
+
+Язык хранится в куке, в URL его нет. `$setLocale` пишет куку и перезагружает страницу.
+
+<Callout title="Почему полная перезагрузка">
+Часть данных на страницах грузится императивно, вне `useAsyncData`. Мягкое обновление их не трогает, поэтому на экране оставались куски старого языка. Перезагрузка решает это без гонок и без обхода всех страниц.
+</Callout>
+
+Для Options API есть отдельная тонкость: список, собранный через `$t()`, обязан быть в `computed`, а не в `data()`. В `data()` он посчитается один раз, при создании компонента, и после смены языка останется старым.
+
+## PrimeVue
+
+Компоненты автоимпортируются модулем, писать `import Button from 'primevue/button'` не нужно.
+
+Локаль PrimeVue (названия месяцев, подписи пагинатора, кнопки в диалогах) ставит отдельный плагин, из тех же ключей словаря. Список ключей лежит в `unicore-common/locales`, чтобы фронт и словарь не разъезжались.
+
+Пара граблей, на которые уже наступали:
+
+- Компонент `Form` из PrimeVue 4 конфликтует по имени с `Form` из vee-validate. В шаблонах используется псевдоним `VeeForm`.
+- `.p-fluid` растягивает всё, что внутри, включая то, что растягивать не хотелось. Локальные исключения ищите в стилях, а не в шаблонах.
+
+## Вебсокеты
+
+Плагин `socket.client.ts` поднимает Socket.IO-соединение и складывает состояние в стор `io`. Оттуда онлайн серверов в реальном времени обновляется на главной, в списке серверов и в карточке.
+
+## Импорты CJS-пакетов
+
+<Callout type="error" title="Именованный импорт из CJS ломает прод">
+```ts
+import { extendMoment } from 'moment-range'  // работает в dev, 500 в проде
+```
+
+В dev-режиме Vite предварительно бандлит зависимость и именованный импорт проходит. Собранный SSR запускается голым Node, и он падает с `SyntaxError: Named export not found` — вся страница отдаёт 500.
+
+Рабочая форма:
+
+```ts
+import * as momentRange from 'moment-range'
+
+const { extendMoment } = (momentRange as any).default ?? momentRange
+```
+</Callout>
+
+Проверка типов и `pnpm run build` такое не ловят, падает всё только при запуске. Если правите плагины, после сборки запустите `node .output/server/index.mjs` и дёрните пару страниц curl'ом.
+
+## Дев-режим
+
+```bash
+pnpm run dev
+```
+
+Поднимает всё сразу. Если правите только фронт, можно поднять один пакет:
+
+```bash
+pnpm --filter unicore-client run dev
+```
+
+Но `unicore-common` при этом должен быть собран, иначе типы не найдутся.
