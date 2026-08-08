@@ -41,7 +41,7 @@ description: Монорепо, четыре пакета, кто от кого �
 | Сервер | NestJS 11, TypeORM 0.3, Express, Socket.IO |
 | Фронты | Nuxt 3, Vue 3, PrimeVue 4 |
 | База | MySQL / MariaDB / PostgreSQL |
-| Пакетный менеджер | pnpm 9, Node 20–24 |
+| Пакетный менеджер | pnpm 11, Node 22–24 |
 | Общий пакет | TypeScript, сборка через tsup |
 
 ## `unicore-common`
@@ -87,6 +87,36 @@ pnpm run format
 <Callout title="Общий пакет собирается первым">
 `dev` и `build:server` сначала собирают `unicore-common`. Если этого не сделать, TypeScript будет ругаться на несуществующие типы, ведь появляются они только после сборки.
 </Callout>
+
+## Настройки pnpm
+
+Всё, что раньше лежало в `.npmrc` и в секции `pnpm` корневого `package.json`, теперь собрано в `pnpm-workspace.yaml`: одиннадцатая версия pnpm читает настройки только оттуда, а `.npmrc` оставила под авторизацию и реестры.
+
+```yaml
+nodeLinker: hoisted        # плоский node_modules, как раньше
+engineStrict: true
+strictPeerDependencies: false
+autoInstallPeers: true
+
+overrides:                 # переехали из package.json
+  canvas: ^3.1.0
+  fastify: ^5.8.5
+
+allowBuilds:               # кому разрешено запускать postinstall
+  bcrypt: true
+  canvas: true
+  esbuild: true
+  '@parcel/watcher': true
+  core-js: false
+  es5-ext: false
+  '@scarf/scarf': false
+```
+
+<Callout type="warn" title="Скрипты зависимостей не запускаются сами">
+С десятой версии pnpm блокирует `postinstall` у пакетов — так угнанные npm-пакеты воруют токены. Разрешение выдаётся поимённо через `allowBuilds`. В проекте оно нужно четверым: `bcrypt` и `canvas` собирают нативные биндинги, `esbuild` и `@parcel/watcher` распаковывают бинарники. Остальным разрешение не нужно, у них в `postinstall` просьбы о донате и телеметрия.
+</Callout>
+
+Ещё одно умолчание одиннадцатой версии: пакеты моложе суток не устанавливаются (`minimumReleaseAge`). Защита от свежезалитых вредоносных релизов. Если сборка вдруг падает на `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION`, значит в локфайл попала вчерашняя версия — пересоберите его через `pnpm clean --lockfile` и `pnpm install`, pnpm подберёт отлежавшиеся.
 
 ## Порты
 

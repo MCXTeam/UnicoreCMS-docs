@@ -83,12 +83,18 @@ docker compose exec app pnpm run sync
 
 ### Node и pnpm
 
-Нужен Node 20–24, рекомендуется 22 (версия зафиксирована в `.nvmrc`). pnpm ставится через corepack:
+Нужен Node 22–24, рекомендуется 22 (версия зафиксирована в `.nvmrc`). pnpm ставится через corepack:
 
 ```bash
 corepack enable
-corepack prepare pnpm@9.15.9 --activate
+corepack prepare pnpm@11.20.0 --activate
 ```
+
+Версию pnpm держит поле `packageManager` в корневом `package.json`, так что вручную следить за ней не придётся: corepack подставит нужную сам.
+
+<Callout type="warn" title="Установка в CI">
+Начиная с одиннадцатой версии pnpm спрашивает подтверждение, когда собирается снести `node_modules`, и без терминала падает с `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY`. В контейнерах и на сборочных агентах ставьте переменную `CI=true` — в Dockerfile проекта она уже прописана.
+</Callout>
 
 </Step>
 
