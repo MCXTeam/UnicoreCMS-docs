@@ -1,0 +1,105 @@
+---
+title: Встраивание в интерфейс
+description: Пункты меню, вкладки и слоты на готовых экранах
+---
+
+Кроме собственных страниц модуль добавляет пункты навигации и вставляет блоки в готовые экраны ядра. И то и другое объявляется в плагине слоя.
+
+```ts title="client/plugins/register.ts"
+import { defineClientModule } from 'unicore-api/client'
+import Gallery from '../components/Gallery.vue'
+import FooterLinks from '../components/FooterLinks.vue'
+
+export default defineNuxtPlugin(() => {
+  defineClientModule({
+    id: 'screens',
+    nav: [
+      { key: 'screens', to: '/mod/screens', label: 'mod.screens.title', icon: 'bx bx-image', places: ['navbar'], order: 50 },
+      { key: 'screens.tab', to: '/mod/screens/my', label: 'mod.screens.tab', places: ['cabinet.tabs'], order: 95 },
+    ],
+    slots: [
+      { slot: 'server.page', component: Gallery, order: 10 },
+      { slot: 'footer', component: FooterLinks, order: 10 },
+    ],
+  })
+})
+```
+
+<Callout type="warn" title="Компонент передаётся импортом">
+Строку с именем компонента ядро тоже примет, но резолвится она только для компонентов, объявленных в слое с `global: true`. На собранном фронте неудачная строка не даёт ни ошибки, ни предупреждения — просто пустое место. Импортируйте компонент и передавайте его самого.
+</Callout>
+
+## Места навигации
+
+| Место | Где видно |
+| --- | --- |
+| `navbar` | Верхнее меню сайта |
+| `footer` | Ссылки в подвале |
+| `cabinet` | Верхнее меню кабинета |
+| `cabinet.tabs` | Вкладки кабинета |
+| `store.tabs` | Вкладки магазина |
+| `players.tabs` | Вкладки раздела «Игроки» |
+
+Поле `when` решает, кому пункт виден: `always` (по умолчанию), `auth` — только вошедшим, `guest` — только гостям. То же поле есть у слота. `order` задаёт порядок среди соседей: ядро занимает шаги по десяткам, так что промежуточные значения свободны.
+
+## Слоты сайта
+
+| Слот | Куда попадает | Что получает |
+| --- | --- | --- |
+| `home.top`, `home.bottom` | Главная, до и после новостей | — |
+| `footer` | Подвал под ссылками | — |
+| `servers.list` | Список серверов | `servers` |
+| `server.page` | Страница сервера | `server` |
+| `news.page` | Под текстом новости | `news` |
+| `user.profile` | Публичный профиль игрока | `user` |
+| `start.page` | Страница «Начать игру» | — |
+| `cabinet.index` | Главная кабинета | — |
+| `store.catalog` | Каталог магазина | — |
+| `store.product` | Карточка товара | `product`, `server` |
+| `donate.index` | Выбор сервера для доната | — |
+| `donate.server` | Страница доната сервера | `server` |
+
+## Слоты панели
+
+| Слот | Куда попадает | Что получает |
+| --- | --- | --- |
+| `dashboard` | Панель управления | — |
+| `users.profile` | Карточка игрока | `user` |
+
+Объявляются через `defineAdminModule` из `unicore-api/admin`. Там же — пункты меню панели (`menu`) и права на маршруты модуля (`access`: `superuser` либо список прав). Пункты всех модулей собираются в отдельную группу «Расширения» внизу меню.
+
+```ts title="admin/plugins/register.ts"
+import { defineAdminModule } from 'unicore-api/admin'
+import DashboardCard from '../components/DashboardCard.vue'
+
+export default defineNuxtPlugin(() => {
+  defineAdminModule({
+    id: 'screens',
+    menu: [{ label: 'mod.screens.title', icon: 'pi pi-images', to: '/mod/screens' }],
+    access: { '/mod/screens': ['mod.screens.read'] },
+    slots: [{ slot: 'dashboard', component: DashboardCard, order: 10 }],
+  })
+})
+```
+
+## Данные слота
+
+Компонент получает их обычными пропсами:
+
+```vue title="components/Gallery.vue"
+<template>
+  <div v-if="shots.length" class="panel">
+    <h2>{{ $t('mod.screens.title') }}</h2>
+    <img v-for="shot in shots" :key="shot.id" :src="shot.url" />
+  </div>
+</template>
+
+<script setup lang="ts">
+const props = defineProps<{ server?: { id: number } }>()
+const { data: shots } = await useFetch(`/mod/screens?server=${props.server?.id}`)
+</script>
+```
+
+<Callout title="Опечатку видно сразу">
+Неизвестное имя слота или места ядро сообщает в консоли при регистрации модуля. Экран не остаётся молча пустым.
+</Callout>

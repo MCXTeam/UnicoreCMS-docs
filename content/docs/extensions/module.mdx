@@ -1,0 +1,171 @@
+---
+title: Как написать модуль
+description: Манифест, серверная часть, настройки, права и строки
+---
+
+## Раскладка
+
+```
+modules/<id>/
+  module.json           манифест
+  server/index.js       предсобранный CJS
+  server-src/           исходники серверной части, в поставке не нужны
+  client/               слой Nuxt для сайта
+  admin/                слой Nuxt для панели
+  locales/{ru,en}.json  строки модуля
+```
+
+Серверная часть поставляется собранной: ядро грузит её через `require`, TypeScript в рантайме никто не компилирует. Собирайте tsup с `@swc/core` — метаданные декораторов Nest и TypeORM обязаны попасть в бандл, иначе модуль не поднимется.
+
+## Манифест
+
+```json
+{
+  "id": "screens",
+  "name": { "ru": "Скриншоты", "en": "Screenshots" },
+  "description": { "ru": "Галерея скриншотов с серверов", "en": "Server screenshots" },
+  "version": "1.0.0",
+  "unicoreApi": "^1.0.0",
+  "author": "Nick",
+  "license": "MIT",
+  "server": "./server/index.js",
+  "locales": "./locales",
+  "componentPrefix": "ModScreens",
+  "permissions": ["mod.screens.read", "mod.screens.write"],
+  "config": [
+    {
+      "key": "limit",
+      "type": "number",
+      "default": 20,
+      "min": 1,
+      "max": 100,
+      "label": "mod.screens.config_limit",
+      "hint": "mod.screens.config_limit_hint"
+    }
+  ],
+  "client": "./client",
+  "admin": "./admin"
+}
+```
+
+<TypeTable
+  type={{
+    id: { description: 'Идентификатор. Задаёт все префиксы модуля', type: 'string', required: true },
+    version: { description: 'Версия модуля', type: 'string', required: true },
+    unicoreApi: { description: 'Диапазон версий контракта, semver', type: 'string', required: true },
+    server: { description: 'Путь к собранной серверной части', type: 'string' },
+    client: { description: 'Папка слоя Nuxt для сайта', type: 'string' },
+    admin: { description: 'Папка слоя Nuxt для панели', type: 'string' },
+    locales: { description: 'Папка со строками модуля', type: 'string' },
+    componentPrefix: { description: 'Префикс Vue-компонентов слоя', type: 'string' },
+    permissions: { description: 'Права, которые модуль вводит', type: 'string[]' },
+    config: { description: 'Схема настроек для формы в панели', type: 'ConfigField[]' },
+  }}
+/>
+
+## Пространства имён
+
+`id` задаёт префиксы, они проверяются при загрузке. Нарушение означает, что модуль не загрузится, а причина появится в панели.
+
+| Что | Префикс |
+| --- | --- |
+| Таблицы | `mod_<id>_` |
+| Настройки | `mod_<id>_`, публичные `public_mod_<id>_` |
+| Права и ключи строк | `mod.<id>.` |
+| HTTP-маршруты | `/mod/<id>` |
+| Страницы фронтов | `/mod/<id>` |
+| Компоненты Vue | `componentPrefix` из манифеста |
+
+## Серверная часть
+
+```ts
+import { defineModule } from 'unicore-api/server'
+import { ScreensModule } from './screens.module'
+import { Screenshot } from './entities/screenshot.entity'
+import ru from '../locales/ru.json'
+import en from '../locales/en.json'
+
+export default defineModule({
+  id: 'screens',
+  entities: [Screenshot],
+  nestModules: [ScreensModule],
+  permissions: ['mod.screens.read', 'mod.screens.write'],
+  locales: { ru, en },
+  setup(context) {
+    context.logger.log('Модуль скриншотов подключён')
+
+    context.events.on(
+      'user.banned',
+      async ({ uuid }) => {
+        await context.core().db.getRepository(Screenshot).delete({ uuid })
+      },
+      context.id,
+    )
+  },
+})
+```
+
+Сущности из `entities` попадают в общий `DataSource`, поэтому таблицы создаёт обычный `pnpm run sync`. Модули Nest из `nestModules` подключаются к приложению как свои: контроллеры, провайдеры, задачи по расписанию работают без оговорок.
+
+Обработчики событий не блокируют ядро, их ошибки логируются с префиксом `[module:<id>]`. Третий аргумент `on` — идентификатор модуля, по нему подписки снимаются при выключении.
+
+## Маршруты
+
+```ts
+import { Body, Controller, Get, Post } from '@nestjs/common'
+import { CurrentUser, Permissions, Public } from 'unicore-api/server'
+
+@Controller('mod/screens')
+export class ScreensController {
+  @Public()
+  @Get()
+  list() {}
+
+  @Permissions(['mod.screens.write'])
+  @Post()
+  create(@CurrentUser() user: { uuid?: string }, @Body() body: unknown) {}
+}
+```
+
+<Callout type="warn" title="По умолчанию закрыто всё">
+Глобальные гварды ядра требуют входа на каждом маршруте, включая маршруты модулей. Публичной ручке нужен `@Public()`. А глобальный `ValidationPipe({ whitelist: true })` вырезает из тела запроса поля, не описанные через class-validator, — описывайте DTO целиком, иначе значения молча не дойдут.
+</Callout>
+
+## Настройки
+
+Поля из `config` в манифесте превращаются в форму: на странице «Модули» у модуля со схемой появляется кнопка настроек. `label` и `hint` — ключи строк, а не готовый текст. Значение с `public: true` уезжает в публичный конфиг и доступно на сайте без авторизации.
+
+Читать и писать настройки из кода — через фасад `config`:
+
+```ts
+const limit = await context.core().config.getNumber('mod_screens_limit', 20)
+```
+
+## Строки
+
+Ядро читает строки из папки, указанной в `locales` манифеста, и при старте досеивает их в общий словарь. Поправить перевод и перезапустить сервер достаточно — пересобирать модуль не нужно. Ключи начинаются с `mod.<id>.`, редактируются в разделе «Локализация» наравне с остальными.
+
+```json
+{
+  "mod.screens.title": "Скриншоты",
+  "mod.screens.config_limit": "Сколько показывать",
+  "mod.screens.config_limit_hint": "От 1 до 100 снимков на странице."
+}
+```
+
+## Свои страницы
+
+Страницы модуля живут в слое Nuxt и лежат по пути `/mod/<id>`:
+
+```ts title="client/nuxt.config.ts"
+export default defineNuxtConfig({
+  components: [{ path: './components', prefix: 'ModScreens', pathPrefix: false }],
+  routeRules: { '/mod/screens/my': { ssr: false } },
+})
+```
+
+<Callout title="Страница за входом должна быть SPA">
+Страницу с `middleware: ['auth']` объявляйте в `routeRules` как `ssr: false`. При серверном рендеринге токена ещё нет, и гостя отправит на страницу входа вместо содержимого.
+</Callout>
+
+Дальше — [встраивание в готовые экраны](/docs/extensions/ui): меню, вкладки и слоты.

@@ -1,0 +1,106 @@
+---
+title: Темы
+description: Слой вёрстки для сайта или панели, подмена страниц и палитра
+---
+
+Тема — полноценный слой вёрстки: она подменяет и убирает страницы ядра, добавляет свои страницы и компоненты, задаёт палитру PrimeVue и собственные стили. Тем может лежать сколько угодно рядом, активная выбирается в панели.
+
+## Раскладка
+
+```
+themes/<id>/
+  theme.json            манифест
+  nuxt.config.ts        регистрация компонентов темы
+  assets/tokens.scss    стили вёрстки
+  components/           компоненты с префиксом из componentPrefix
+  pages/                страницы темы
+  locales/{ru,en}.json  строки темы с ключами theme.<id>.
+```
+
+## Манифест
+
+```json title="themes/aurora/theme.json"
+{
+  "id": "aurora",
+  "name": { "ru": "Аврора", "en": "Aurora" },
+  "version": "1.0.0",
+  "unicoreApi": "^1.3.0",
+  "side": "client",
+  "componentPrefix": "Theme",
+  "primevue": "lara",
+  "primevueTokens": {
+    "semantic": {
+      "primary": { "500": "#7c3aed", "600": "#6d28d9" },
+      "borderRadius": { "md": "8px" }
+    }
+  },
+  "tokens": "./assets/tokens.scss",
+  "pages": {
+    "replace": { "/": "./pages/index.vue" },
+    "remove": ["/start"]
+  }
+}
+```
+
+<TypeTable
+  type={{
+    side: { description: 'Для чего тема: сайт или панель', type: "'client' | 'admin'", default: "'client'" },
+    componentPrefix: { description: 'Префикс Vue-компонентов темы', type: 'string' },
+    primevue: { description: 'Пресет PrimeVue', type: "'aura' | 'lara' | 'nora' | 'material'", default: "'aura'" },
+    primevueTokens: { description: 'Палитра и радиусы поверх пресета, те же токены, что принимает definePreset', type: 'object' },
+    tokens: { description: 'Файл со стилями темы', type: 'string' },
+    'pages.replace': { description: 'Маршрут → файл страницы темы', type: 'Record<string, string>' },
+    'pages.remove': { description: 'Маршруты ядра, которые тема убирает', type: 'string[]' },
+  }}
+/>
+
+## Подмена страниц
+
+Только через `pages.replace` в манифесте. Файл `themes/<id>/pages/index.vue` сам по себе главную не заменит: Nuxt считает страницы проекта приоритетнее страниц слоя и выкидывает дубль ещё до сборки маршрутов.
+
+```json
+"pages": {
+  "replace": {
+    "/": "./pages/index.vue",
+    "/servers": "./pages/servers.vue"
+  }
+}
+```
+
+## Палитра
+
+<Callout type="warn" title="Переменные --p-* в CSS не сработают">
+PrimeVue вставляет свои переменные скриптом при инициализации — позже любого файла стилей и с той же специфичностью. Файл темы их не перебьёт. Цвета, радиусы и прочие токены задаются только через `primevue` и `primevueTokens` в манифесте.
+</Callout>
+
+Собственная вёрстка темы — отступы, сетки, декоративные элементы — живёт в файле из `tokens`. Он подключается вместе со слоем.
+
+Светлая и тёмная схемы к темам отношения не имеют: переключатель есть в ядре и работает в любой теме.
+
+## Стороны
+
+`side` говорит, для чего тема: `client` — сайт, `admin` — панель управления. Стороны независимы, поэтому сайт и панель могут одновременно работать под разными темами.
+
+## Выбор активной темы
+
+**Утилиты → Темы.** Две секции — темы сайта и темы панели, у каждой свой выбор. Он хранится в `themes/state.json`.
+
+После смены темы соответствующий фронт нужно пересобрать:
+
+```bash
+pnpm run build:client
+pnpm run build:admin
+```
+
+Переменные `UNICORE_THEME` и `UNICORE_ADMIN_THEME` в `.env` жёстко фиксируют тему своей стороны и блокируют выбор из панели — так удобно для стендов и CI.
+
+## Строки темы
+
+Лежат в её собственной папке `locales/` с ключами `theme.<id>.`. При старте сервера ключи активной темы попадают в общий словарь и правятся в разделе «Локализация» наравне с остальными.
+
+```json title="themes/aurora/locales/ru.json"
+{
+  "theme.aurora.hero_title": "Добро пожаловать",
+  "theme.aurora.hero_button": "Начать игру"
+}
+```

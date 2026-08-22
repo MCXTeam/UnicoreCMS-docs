@@ -1,0 +1,103 @@
+---
+title: Контракт unicore-api
+description: Фасады ядра, события, возможности и версии
+---
+
+Пакет `unicore-api` — единственная дверь между расширением и ядром. Прямых импортов из кода сервера нет: в поставке лежит собранный и обфусцированный `dist`, исходников сервера там просто не существует.
+
+```ts
+import { defineModule, Public, Permissions, CurrentUser, core, capabilities } from 'unicore-api/server'
+import { defineClientModule } from 'unicore-api/client'
+import { defineAdminModule } from 'unicore-api/admin'
+```
+
+## Версии
+
+У контракта своя ось версий, отдельная от версии CMS. Модуль объявляет диапазон в `unicoreApi`, и несовместимый модуль не грузится — причина видна на странице «Модули».
+
+| Что меняется | Как растёт версия |
+| --- | --- |
+| Добавили фасад, событие или поле | Минорная |
+| Изменили или убрали существующее | Мажорная |
+
+Публичная поверхность зафиксирована снимком `api-report.d.txt`: любое изменение экспортов видно в diff и проверяется в CI. Случайно расширить контракт не получится.
+
+## Фасады
+
+Всё, что ядро отдаёт модулю, доступно через `core()`.
+
+| Фасад | Что даёт |
+| --- | --- |
+| `users` | Игрок по uuid, нику или email; его права |
+| `config` | Чтение и запись настроек CMS |
+| `locales` | Язык по умолчанию, включённые языки, словарь ключей |
+| `issuance` | Выдача предметов, групп и прав на сервер, произвольные RCON-команды |
+| `servers` | Список серверов и их онлайн |
+| `money` | Игровой и реальный баланс: чтение, начисление, списание |
+| `payments` | Методы, создание платежа, подтверждение, разовое начисление |
+| `webhooks` | Каналы, цели и рассылка своего поста в Discord, Telegram, VK |
+| `mail` | Письмо на адрес или игроку по uuid |
+| `storage` | Сохранение и удаление файлов, ссылка на файл |
+| `cache` | Общий кэш ядра |
+| `db` | `DataSource` TypeORM для своих таблиц |
+| `logger` | Лог с префиксом модуля |
+
+```ts
+const api = core()
+
+const user = await api.users.getByUsername('Steve')
+await api.money.giveIngame(user.uuid, 1, 500)
+await api.issuance.runCommands(1, [`tp ${user.username} 0 100 0`])
+await api.webhooks.send('discord', { title: 'Выдан набор', description: `Игрок ${user.username} получил стартовый набор` })
+```
+
+## События
+
+`context.events.on(name, handler, context.id)` в `setup`. Обработчики не блокируют ядро, их ошибки логируются с префиксом `[module:<id>]`, а подписки снимаются при выключении модуля.
+
+| Событие | Что приходит |
+| --- | --- |
+| `core.ready` | `version` |
+| `core.shutdown` | — |
+| `user.registered` | `uuid`, `username`, `email` |
+| `user.activated` | `uuid`, `username` |
+| `user.login` | `uuid`, `username`, `ip` |
+| `user.password.changed` | `uuid`, `username` |
+| `user.banned` | `uuid`, `username`, `reason`, `until` |
+| `user.unbanned` | `uuid`, `username` |
+| `payment.created` | `id`, `uuid`, `amount`, `method` |
+| `payment.paid` | `id`, `uuid`, `amount`, `method` |
+| `purchase.completed` | `uuid`, `serverId`, `kind`, `itemId`, `amount` |
+| `donate.group.granted` / `revoked` | `uuid`, `serverId`, `groupId`, `seconds` |
+| `donate.permission.granted` / `revoked` | `uuid`, `serverId`, `permissionId`, `seconds` |
+| `gift.activated` | `uuid`, `promocode`, `type` |
+| `news.published` | `id`, `title` |
+
+## Возможности
+
+Модуль спрашивает возможность, а не сравнивает номера версий: список растёт вместе с контрактом, и проверка переживает обновления.
+
+```ts
+if (capabilities().has('payments.credit')) {
+  await core().payments.credit(uuid, 100, 'promo')
+}
+
+capabilities().require('storage.write')
+```
+
+Что умеет ядро сейчас: `core.events`, `users.read`, `config.read`, `config.write`, `locales.read`, `issuance.product`, `issuance.group`, `issuance.permission`, `issuance.commands`, `servers.online`, `payments.methods`, `payments.credit`, `webhooks.send`, `mail.send`, `storage.write`, `cache`, `db.datasource`.
+
+## Своя платёжная система
+
+Модуль объявляет `paymentModules` — модули Nest, которые регистрируют метод оплаты. Дальше работа идёт через `payments.create` и `payments.complete`, а ядро само проводит зачисление и рассылает `payment.paid`.
+
+## Свой канал вебхуков
+
+`webhookChannels` в определении модуля добавляет канал в общий список: он появляется в панели рядом с Discord, Telegram и VK, и на него можно назначать цели.
+
+```ts
+export default defineModule({
+  id: 'screens',
+  webhookChannels: [new MyChannel()],
+})
+```
