@@ -3,5 +3,14 @@
   "title": "Расширения",
   "description": "Модули и темы: как поставить и как написать",
   "icon": "Puzzle",
-  "pages": ["index", "install", "module", "ui", "theme", "api", "limits"]
+  "pages": [
+    "index",
+    "install",
+    "module",
+    "ui",
+    "theme",
+    "api",
+    "team",
+    "limits"
+  ]
 }

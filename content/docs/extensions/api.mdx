@@ -28,11 +28,12 @@ import { defineAdminModule } from 'unicore-api/admin'
 
 | Фасад | Что даёт |
 | --- | --- |
-| `users` | Игрок по uuid, нику или email; его права |
+| `users` | Игрок по uuid, нику или email; поиск по части ника; его права, скин и оформление роли |
 | `config` | Чтение и запись настроек CMS |
 | `locales` | Язык по умолчанию, включённые языки, словарь ключей |
 | `issuance` | Выдача предметов, групп и прав на сервер, произвольные RCON-команды |
 | `servers` | Список серверов и их онлайн |
+| `staff` | Состав команды: обладатели служебных ролей сайта и служебных привилегий |
 | `money` | Игровой и реальный баланс: чтение, начисление, списание |
 | `payments` | Методы, создание платежа, подтверждение, разовое начисление |
 | `webhooks` | Каналы, цели и рассылка своего поста в Discord, Telegram, VK |
@@ -46,9 +47,41 @@ import { defineAdminModule } from 'unicore-api/admin'
 const api = core()
 
 const user = await api.users.getByUsername('Steve')
+const found = await api.users.search('Ste', 10)
+const team = await api.staff.members()
 await api.money.giveIngame(user.uuid, 1, 500)
 await api.issuance.runCommands(1, [`tp ${user.username} 0 100 0`])
 await api.webhooks.send('discord', { title: 'Выдан набор', description: `Игрок ${user.username} получил стартовый набор` })
+```
+
+## Переводы своего контента
+
+Строки, которые владелец пишет сам — заголовок, описание, подпись, — переводятся тем же механизмом, что и новости ядра. Повесьте на сущность `@Translatable` и назовите её `mod.<id>.<что-это>`:
+
+```ts
+import { Translatable } from 'unicore-api/server'
+
+@Translatable('mod.team.note', ['text'], { read: ['mod.team.read'], write: ['mod.team.write'] })
+@Entity({ name: 'mod_team_notes' })
+export class TeamNote {
+  @PrimaryColumn({ name: 'id' })
+  id: string
+
+  @Column('text', { name: 'text', nullable: true })
+  text: string
+}
+```
+
+Третий аргумент — права на чтение и запись перевода: без него панель откажет в доступе к редактору. Дальше всё делает ядро: сущность, отданная из вашего контроллера, приезжает клиенту на языке запроса, а редактор переводов открывается по адресу `/content-translations/mod.team.note/<id>`.
+
+Два условия: у сущности должно быть поле `id` (по нему ядро находит перевод) и она должна попасть в ответ как есть, а не быть переписана в новый объект — переводится сама сущность, а не её копия.
+
+В админской странице модуля тот же редактор подключается парой строк:
+
+```ts
+const NOTE_FIELDS = [{ path: 'text', label: 'mod.team.member_note', type: 'textarea' }]
+
+useContentTranslations('mod.team.note', NOTE_FIELDS)
 ```
 
 ## События
