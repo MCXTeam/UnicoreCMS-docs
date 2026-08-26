@@ -58,9 +58,9 @@ const socket = io('https://api.example.com', {
 | `public` | Все неавторизованные |
 | `user:<uuid>` | Конкретный пользователь |
 | `api-key:<секрет>` | Конкретный API-ключ |
-| Каждое право пользователя | Например `kernel.unicore.connect` |
+| Каждое право пользователя | Например `kernel.connect` |
 
-Комнаты по правам работают так: событие в комнату `kernel.unicore.connect` получают все плагины, и только они.
+Комнаты по правам работают так: событие в комнату `kernel.connect` получают все плагины, и только они.
 
 ## События от сервера
 
@@ -68,10 +68,10 @@ const socket = io('https://api.example.com', {
 | --- | --- | --- |
 | `me` | Каждому при подключении | Текущий пользователь или `null` |
 | `servers/online` | Всем | Онлайн по серверам |
-| `give_group` | `kernel.unicore.connect` | Игрок купил привилегию |
-| `take_group` | `kernel.unicore.connect` | Срок привилегии вышел |
-| `give_permission` | `kernel.unicore.connect` | Куплено отдельное право |
-| `take_permission` | `kernel.unicore.connect` | Срок права вышел |
+| `give_group` | `kernel.connect` | Игрок купил привилегию |
+| `take_group` | `kernel.connect` | Срок привилегии вышел |
+| `give_permission` | `kernel.connect` | Куплено отдельное право |
+| `take_permission` | `kernel.connect` | Срок права вышел |
 
 ## Запросы к серверу
 

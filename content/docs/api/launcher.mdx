@@ -14,7 +14,7 @@ description: Интеграция с GravitLauncher и отдача скинов
 
 ### Выпустить ключ
 
-**Утилиты → API-ключи → Создать**, право `kernel.unicore.provider`, в разрешённые адреса — IP машины, где стоит LaunchServer.
+**Утилиты → API-ключи → Создать**, право `kernel.provider`, в разрешённые адреса — IP машины, где стоит LaunchServer.
 
 </Step>
 
@@ -42,7 +42,7 @@ curl https://api.example.com/auth/gravit/ping \
 
 ## Ручки
 
-Все требуют право `kernel.unicore.provider`.
+Все требуют право `kernel.provider`.
 
 | Метод | Путь | Что делает |
 | --- | --- | --- |
@@ -88,7 +88,7 @@ curl https://api.example.com/auth/gravit/ping \
 | `/cabinet/skin/public/cloak/username/:username` | Плащ по нику |
 | `/cabinet/skin/public/cloak/uuid/:uuid` | Плащ по UUID |
 
-Файлы лежат в папке `storage`, сервер раздаёт их статикой. Загружает их игрок сам из кабинета, если у него есть право `user.cabinet.skin`. HD-версии открывает отдельное право, его обычно продают.
+Файлы лежат в папке `storage`, сервер раздаёт их статикой. Загружает их игрок сам из кабинета, если у него есть право `player.skin.upload`. HD-версии открывает отдельное право, его обычно продают.
 
 ## Публичные профили
 

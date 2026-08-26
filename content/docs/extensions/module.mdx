@@ -68,7 +68,10 @@ import { SCREEN_TYPES } from '../../../../shared/constants'
   "server": "./server/index.js",
   "locales": "./locales",
   "componentPrefix": "ModScreens",
-  "permissions": ["mod.screens.read", "mod.screens.write"],
+  "permissions": [
+    { "key": "mod.screens.read" },
+    { "key": "mod.screens.write", "danger": true }
+  ],
   "config": [
     {
       "key": "limit",
@@ -95,10 +98,25 @@ import { SCREEN_TYPES } from '../../../../shared/constants'
     admin: { description: 'Папка слоя Nuxt для панели', type: 'string' },
     locales: { description: 'Папка со строками модуля', type: 'string' },
     componentPrefix: { description: 'Префикс Vue-компонентов слоя', type: 'string' },
-    permissions: { description: 'Права, которые модуль вводит', type: 'string[]' },
+    permissions: { description: 'Права, которые модуль вводит', type: 'ModulePermission[]' },
     config: { description: 'Схема настроек для формы в панели', type: 'ConfigField[]' },
   }}
 />
+
+### Права модуля
+
+Право задаётся объектом; строкой тоже можно, если хватает одного ключа.
+
+<TypeTable
+  type={{
+    key: { description: 'Ключ права, начинается с `mod.<id>.`', type: 'string', required: true },
+    group: { description: 'Раздел в редакторе ролей, по умолчанию `mod.<id>`', type: 'string' },
+    scope: { description: 'Уточнение сервером: `server`', type: "'server'" },
+    danger: { description: 'Право не выдаётся маской со звёздочкой, только отметкой вручную', type: 'boolean' },
+  }}
+/>
+
+Название права и подсказку модуль кладёт в свои строки: ключи `perm.mod.<id>.<право>`, `perm.mod.<id>.<право>.hint` и `perm.group.mod.<id>` для названия раздела. Без них в редакторе ролей будет виден сырой ключ.
 
 ## Пространства имён
 
@@ -108,7 +126,7 @@ import { SCREEN_TYPES } from '../../../../shared/constants'
 | --- | --- |
 | Таблицы | `mod_<id>_` |
 | Настройки | `mod_<id>_`, публичные `public_mod_<id>_` |
-| Права и ключи строк | `mod.<id>.` |
+| Права и ключи строк | `mod.<id>.`, названия прав — `perm.mod.<id>.` |
 | HTTP-маршруты | `/mod/<id>` |
 | Страницы фронтов | `/mod/<id>` |
 | Компоненты Vue | `componentPrefix` из манифеста |
@@ -126,7 +144,7 @@ export default defineModule({
   id: 'screens',
   entities: [Screenshot],
   nestModules: [ScreensModule],
-  permissions: ['mod.screens.read', 'mod.screens.write'],
+  permissions: [{ key: 'mod.screens.read' }, { key: 'mod.screens.write', danger: true }],
   locales: { ru, en },
   setup(context) {
     context.logger.log('Модуль скриншотов подключён')
