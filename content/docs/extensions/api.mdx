@@ -28,7 +28,7 @@ import { defineAdminModule } from 'unicore-api/admin'
 
 | Фасад | Что даёт |
 | --- | --- |
-| `users` | Игрок по uuid, нику или email; поиск по части ника; его права, скин и оформление роли |
+| `users` | Игрок по uuid, нику или email; поиск по части ника; его права, скин и оформление роли; проверка права через `can()` |
 | `config` | Чтение и запись настроек CMS |
 | `locales` | Язык по умолчанию, включённые языки, словарь ключей |
 | `issuance` | Выдача предметов, групп и прав на сервер, произвольные RCON-команды |
@@ -48,11 +48,14 @@ const api = core()
 
 const user = await api.users.getByUsername('Steve')
 const found = await api.users.search('Ste', 10)
+const allowed = await api.users.can(user.uuid, 'user.forms.staff')
 const team = await api.staff.members()
 await api.money.giveIngame(user.uuid, 1, 500)
 await api.issuance.runCommands(1, [`tp ${user.username} 0 100 0`])
 await api.webhooks.send('discord', { title: 'Выдан набор', description: `Игрок ${user.username} получил стартовый набор` })
 ```
+
+`users.perms()` отдаёт уже сведённые права: свои, роли и раскрытые маски. `users.can()` добавляет к ним права от донат-групп и всегда пропускает суперпользователя — проверяйте доступ им, а не поиском строки в списке.
 
 ## Переводы своего контента
 

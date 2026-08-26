@@ -10,12 +10,47 @@ modules/<id>/
   module.json           манифест
   server/index.js       предсобранный CJS
   server-src/           исходники серверной части, в поставке не нужны
+  shared/               общее для сервера и фронтов
   client/               слой Nuxt для сайта
   admin/                слой Nuxt для панели
   locales/{ru,en}.json  строки модуля
 ```
 
 Серверная часть поставляется собранной: ядро грузит её через `require`, TypeScript в рантайме никто не компилирует. Собирайте tsup с `@swc/core` — метаданные декораторов Nest и TypeORM обязаны попасть в бандл, иначе модуль не поднимется.
+
+## Сборка
+
+```ts title="tsup.config.ts"
+import { defineConfig } from 'tsup'
+import { MODULE_EXTERNALS } from 'unicore-api'
+
+export default defineConfig({
+  entry: ['server-src/index.ts'],
+  outDir: 'server',
+  format: ['cjs'],
+  clean: true,
+  sourcemap: true,
+  splitting: false,
+  target: 'es2021',
+  external: MODULE_EXTERNALS,
+})
+```
+
+`MODULE_EXTERNALS` — список пакетов, которые модуль обязан брать у ядра, а не тащить свои копии. Помимо очевидных `@nestjs/*` и `typeorm` туда входят `class-validator` и `class-transformer`, и как раз про них забывают.
+
+<Callout type="warn" title="Своя копия class-validator тихо ломает DTO">
+Декораторы `@IsString()` и остальные пишут метаданные в хранилище своей копии пакета. Глобальный `ValidationPipe` ядра смотрит в своё — полей он там не находит и, поскольку включён `whitelist`, молча выбрасывает их из тела запроса. Контроллер получает объект без половины значений, ошибки нет, в базу уходят пустые колонки. Симптом узнаваемый: `Field 'x' doesn't have a default value` при том, что поле точно отправлялось.
+</Callout>
+
+## Общий код модуля
+
+Константы, типы и проверки, нужные и серверу, и фронтам, кладите в `shared/` рядом с `server-src`. tsup вшивает их в бандл, а слои Nuxt импортируют относительным путём:
+
+```ts title="client/pages/mod/screens/index.vue"
+import { SCREEN_TYPES } from '../../../../shared/constants'
+```
+
+Так правило существует в одном месте. В «Конструкторе форм» из `shared/` живут список типов полей, условия показа и функция проверки ответа — сайт подсвечивает ошибку и сервер отклоняет заявку по одному и тому же коду.
 
 ## Манифест
 
