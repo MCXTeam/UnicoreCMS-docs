@@ -3,5 +3,5 @@
   "title": "Интеграции и API",
   "description": "REST, ключи, лаунчеры, плагин, вебхуки",
   "icon": "Plug",
-  "pages": ["index", "auth", "keys", "launcher", "launcher-gml", "connect", "payments", "websocket"]
+  "pages": ["index", "auth", "keys", "launcher", "launcher-gml", "skins", "connect", "payments", "websocket"]
 }
