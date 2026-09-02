@@ -76,6 +76,60 @@ docker compose exec app pnpm run align
 </Step>
 </Steps>
 
+## HTTPS
+
+Профиль `nginx` умеет работать в двух раскладках: `docker/nginx/templates` — обычный HTTP, `docker/nginx/templates-tls` — редирект на 443 и TLS с сертификатом Let's Encrypt. Выбирает раскладку переменная `NGINX_TEMPLATES`, сертификаты выписывает профиль `certbot`.
+
+<Steps>
+<Step>
+
+### Поднять HTTP и направить домены
+
+Домены из `CLIENT_HOST`, `ADMIN_HOST` и `SERVER_HOST` должны резолвиться на сервер, а nginx — отвечать на 80 порту. Шаблон по умолчанию как раз отдаёт `/.well-known/acme-challenge/`, без этого сертификат не выпишется.
+
+</Step>
+
+<Step>
+
+### Выписать сертификат
+
+```bash
+docker compose --profile certbot run --rm certbot
+```
+
+Перед этим задайте `CERTBOT_EMAIL`. Сертификат выписывается сразу на все три домена плюс `www` для основного.
+
+</Step>
+
+<Step>
+
+### Переключить nginx на TLS
+
+```ini
+NGINX_TEMPLATES=templates-tls
+```
+
+```bash
+docker compose --profile nginx up -d --force-recreate nginx
+```
+
+</Step>
+
+<Step>
+
+### Перевести адреса на https
+
+Поменяйте `BASEURL`, `API_BASEURL` и `ADMIN_BASEURL` на `https://`. Это не косметика: именно по схеме в `API_BASEURL` сервер понимает, что работает по TLS, и включает HSTS, флаг `Secure` на куках сессии и `SameSite=None`, без которого админка на отдельном домене не удержит вход.
+
+</Step>
+</Steps>
+
+Продление сертификата — та же команда с `renew`, раз в неделю по крону:
+
+```bash
+docker compose --profile certbot run --rm certbot renew
+```
+
 ## Вручную
 
 <Steps>
