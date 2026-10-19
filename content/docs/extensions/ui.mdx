@@ -101,8 +101,13 @@ export default defineNuxtPlugin(async () => {
 | --- | --- | --- |
 | `dashboard` | Панель управления | — |
 | `users.profile` | Карточка игрока | `user` |
+| `store.product.form` | Создание и редактирование товара, API 1.15+ | `product`, `form`, `disabled` |
 
 Объявляются через `defineAdminModule` из `unicore-api/admin`. Там же — пункты меню панели (`menu`) и права на маршруты модуля (`access`: `superuser` либо список прав). Пункты всех модулей собираются в отдельную группу «Расширения» внизу меню.
+
+Поля в карточке товара используют общий цикл загрузки, проверки и сохранения. Настройки
+записываются обычной кнопкой карточки, отдельная страница модулю не нужна.
+Контракт и пример компонента описаны в [полях форм админки](/docs/extensions/admin-forms).
 
 ```ts title="admin/plugins/register.ts"
 import { defineAdminModule } from 'unicore-api/admin'

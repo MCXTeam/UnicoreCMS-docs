@@ -1,0 +1,79 @@
+---
+title: Поля модулей в формах админки
+description: Загрузка, проверка и сохранение настроек модуля в карточке товара
+---
+
+API 1.15 добавляет слот `store.product.form` в карточку товара. Компонент получает
+`form: AdminFormContext`, текущий `product` и флаг `disabled`. Свои настройки храните
+в отдельном черновике: дополнительные поля не входят в DTO товара.
+
+Регистрация слота в плагине слоя админки:
+
+```ts
+import { defineAdminModule } from 'unicore-api/admin'
+import ProductFields from '../components/ProductFields.vue'
+
+export default defineNuxtPlugin(() => {
+  defineAdminModule({
+    id: 'product_extra',
+    slots: [{ slot: 'store.product.form', component: ProductFields, order: 20 }],
+  })
+})
+```
+
+Компонент синхронно регистрирует обработчики при создании:
+
+```ts
+import type { AdminFormContext } from 'unicore-api/admin'
+
+const props = defineProps<{ form: AdminFormContext; disabled?: boolean }>()
+const { $api } = useNuxtApp()
+const draft = reactive({ value: '' })
+
+const unregister = props.form.register('product_extra', {
+  async load(record) {
+    if (record.id == null) return
+    const { data } = await $api.get(`/mod/product_extra/product/${record.id}`, {
+      signal: props.form.signal,
+    })
+    if (!props.form.signal.aborted) Object.assign(draft, data)
+  },
+  validate() {
+    if (!draft.value.trim()) throw new Error('Заполните значение')
+  },
+  async save(record) {
+    await $api.put(`/mod/product_extra/product/${record.id}`, { ...draft }, {
+      signal: props.form.signal,
+    })
+  },
+  reset() {
+    draft.value = ''
+  },
+})
+
+onBeforeUnmount(unregister)
+```
+
+Хост создаёт `createAdminForm(resource, record)` на каждое открытие карточки и передаёт
+модулю `controller.context`. Функция `record` возвращает актуальные `id`, `mode` и
+`value` основной записи; при создании `id` равен `null`.
+
+Хост вызывает `load()` после монтирования компонентов, `validate()` перед записью
+товара и `save()` после получения его ID. Обработчики ожидаются последовательно.
+Исключение прерывает цепочку и превращается в `AdminFormError` с `moduleId`, `phase`
+и исходной `cause`. При повторе загрузки уже загруженные черновики сохраняются.
+
+Ошибка загрузки блокирует сохранение карточки. Ошибка проверки или записи оставляет
+карточку открытой. После успешного POST ID товара сохраняется сразу, поэтому повтор
+после ошибки модуля или переводов не создаёт дубликат. Неизменённый основной запрос
+при повторе пропускается. Запросы ядра, переводов и модулей выполняются отдельно;
+общей транзакции нет. Обработчик `save` должен выдерживать повторный вызов.
+
+При закрытии `dispose()` отменяет `signal`, вызывает синхронные `reset` в обратном
+порядке и удаляет регистрации. Асинхронные обработчики должны учитывать отмену.
+На одну форму допускается одна регистрация от модуля; обработчики выключенных
+модулей пропускаются. Функция отписки удаляет только свою регистрацию.
+
+Поля остаются смонтированными при переключении вкладок и языка перевода, поэтому
+черновик сохраняется. Компонент должен учитывать `disabled` и проверять права
+пользователя. Серверный endpoint модуля обязан независимо проверять доступ.

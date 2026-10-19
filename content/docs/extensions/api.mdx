@@ -22,6 +22,11 @@ import { defineAdminModule } from 'unicore-api/admin'
 
 Публичная поверхность зафиксирована снимком `api-report.d.txt`: любое изменение экспортов видно в diff и проверяется в CI. Случайно расширить контракт не получится.
 
+В API 1.15 добавлены `createAdminForm`, типы контекста формы и ошибка `AdminFormError`
+из `unicore-api/admin`, а также слот `store.product.form`. Модули с такими полями должны
+объявить `unicoreApi: "^1.15.0"`. Пример подключения находится в
+[документации форм админки](/docs/extensions/admin-forms).
+
 ## Фасады
 
 Всё, что ядро отдаёт модулю, доступно через `core()`.
