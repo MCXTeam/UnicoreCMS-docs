@@ -1,0 +1,119 @@
+---
+title: Интеграции UnicoreConnect
+description: Поддерживаемые платформы, игровые наказания, AFK и vanish
+---
+
+UnicoreConnect обнаруживает установленные моды и плагины при запуске. Для подключения заполните конфиг по инструкции [UnicoreConnect](/docs/api/connect#подключение).
+
+## Платформы
+
+| Платформа | Minecraft | Java |
+| --- | --- | --- |
+| Bukkit, Spigot, Paper и совместимые гибриды | 1.7.10–1.18.1 | 8+ |
+| Forge | 1.7.10, 1.12.2 | 8 |
+| Forge | 1.19.2, 1.20.1 | 17 |
+| NeoForge | 1.21.1 | 21 |
+
+Устанавливайте сборку для своей платформы и версии игры. На гибридах Bukkit-плагин устанавливается в `plugins`, модовая сборка устанавливается в `mods`.
+
+## Наказания
+
+| Мод или плагин | Платформы | Поддержка |
+| --- | --- | --- |
+| Vanilla | Все поддерживаемые платформы | UUID-баны из стандартного банлиста |
+| BanManager | Bukkit | UUID-баны |
+| LiteBans | Bukkit | Ban, mute, warn и события kick; выдача и снятие UUID ban/mute |
+| AdvancedBan | Bukkit | Ban, mute, warn и события kick; выдача и снятие UUID ban/mute |
+| LibertyBans 1.1.4 | Bukkit, Java 17+ | Ban, mute, warn; выдача и снятие UUID ban/mute текущего сервера |
+| ForgeEssentials | Forge 1.7.10, 1.12.2 | Временные баны и mute |
+| ServerUtilities | Forge 1.7.10 | Mute |
+| FTB Utilities | Forge 1.12.2 | Mute |
+| FTB Essentials | Forge 1.19.2, 1.20.1; NeoForge 1.21.1 | Mute и временный mute |
+| Paradigm 2.5.2 | Forge 1.7.10, 1.19.2, 1.20.1; NeoForge 1.21.1 | Ban и mute; отображение warn и jail |
+| Saro’s Essentials | Forge 1.12.2, 1.19.2, 1.20.1; NeoForge 1.21.1 | Ban и tempban |
+| NeoEssentials 1.0.6 | NeoForge 1.21.1 | Ban, tempban, mute и tempmute |
+| Server Essentials Forge | Forge 1.20.1 с SEF 1.1; NeoForge 1.21.1 с SEF 2.0.0 | Mute; временный mute с сайта на NeoForge |
+| MKT Essentials 1.1.1 | NeoForge 1.21.1 | Ban, tempban, mute и tempmute |
+| LuxinfineHelper | Forge 1.7.10 | Баны через установленный провайдер наказаний LuxinfineHelper |
+
+Paradigm 2.5.2 требует Java 17+, включая сборку для Forge 1.7.10. Команды CMS для Paradigm действуют на текущий сервер; сетевые наказания отображаются с их областью действия.
+
+### Выбор источника
+
+На Bukkit `auto` выбирает установленный движок наказаний. Если движков несколько, укажите один: `banmanager`, `litebans`, `advancedban` или `libertybans`. Без стороннего движка используется `vanilla`.
+
+На Forge и NeoForge `auto` подключает ванильный банлист и установленные моды из таблицы. Если бан есть и у мода, и в стандартном банлисте, на сайте он отображается один раз. Для конкретного источника укажите `forgeessentials`, `serverutilities`, `ftbutilities`, `ftbessentials`, `paradigm`, `sarosessentials`, `neoessentials`, `sef`, `mktessentials`, `luxinfine` или `vanilla` на соответствующей платформе.
+
+Значение по умолчанию `legacy` сохраняет прежний источник банов и добавляет наказания установленных модов. Прежний источник на Bukkit: BanManager или vanilla; на Forge 1.7.10: LuxinfineHelper или vanilla.
+
+### Режим синхронизации
+
+- `observe`: наказания из игры отправляются на сайт.
+- `bidirectional`: дополнительно принимаются команды выдачи и снятия из CMS.
+
+Bukkit, файл `plugins/UnicoreConnect/config.yml`:
+
+```yaml
+integrations:
+  punishments:
+    provider: auto
+    mode: bidirectional
+    litebans_scope: local
+  presence:
+    afk_provider: auto
+```
+
+Forge и NeoForge, раздел в `config/unicoreconnect.json`:
+
+```json
+{
+  "integrations": {
+    "punishments": {
+      "provider": "auto",
+      "mode": "bidirectional"
+    },
+    "presence": {
+      "afkProvider": "auto"
+    }
+  }
+}
+```
+
+Вставьте раздел в существующую конфигурацию, сохранив `server`, адрес API и ключ. Модуль `modules.bans` должен быть включён. Для LiteBans `litebans_scope: local` использует сервер, настроенный в LiteBans; в JSON поле называется `liteBansScope`.
+
+## AFK и vanish
+
+| Источник | Платформы | Данные |
+| --- | --- | --- |
+| AFKPlus | Bukkit | AFK |
+| Essentials / EssentialsX | Bukkit | AFK и vanish |
+| CMI | Bukkit | AFK и vanish |
+| SuperVanish / PremiumVanish | Bukkit | Vanish |
+| ForgeEssentials | Forge 1.7.10, 1.12.2 | AFK и vanish |
+| ServerUtilities | Forge 1.7.10 | AFK и vanish |
+| FTB Utilities | Forge 1.12.2 | AFK |
+| Paradigm 2.5.2 | Forge 1.7.10, 1.19.2, 1.20.1; NeoForge 1.21.1 | AFK и vanish |
+| Saro’s Essentials | Forge 1.19.2, 1.20.1; NeoForge 1.21.1 | Vanish |
+| NeoEssentials | NeoForge 1.21.1 | AFK и vanish |
+| Server Essentials Forge | Forge 1.20.1; NeoForge 1.21.1 | Vanish |
+| MKT Essentials | NeoForge 1.21.1 | AFK, vanish и скрытие phantom-игроков |
+| Vanishmod | Forge 1.19.2, 1.20.1; NeoForge 1.21.1 | Vanish |
+| Just Vanish | Поддерживаемые модовые сборки с Just Vanish | Vanish |
+
+AFK-игрок остаётся в публичном онлайне, но его активное время приостанавливается. Игрок в vanish скрыт из публичного счётчика и списка. Подключённые источники vanish проверяются вместе: скрытие в одном из них сохраняется независимо от остальных.
+
+`afk_provider: auto` на Bukkit использует AFKPlus, затем Essentials, затем CMI. На Forge и NeoForge порядок такой: ForgeEssentials, ServerUtilities, FTB Utilities, Paradigm, NeoEssentials, MKT Essentials.
+
+Если подходящего AFK-источника нет или его модуль выключен, Connect использует встроенный учёт активности по движению, повороту, чату и взаимодействиям. Для принудительного выбора встроенного учёта задайте `native`. Для конкретной интеграции задайте её ID: `afkplus`, `essentials`, `cmi`, `forgeessentials`, `serverutilities`, `ftbutilities`, `paradigm`, `neoessentials` или `mktessentials`.
+
+## Права и экономика
+
+Группы и права выдаются через LuckPerms, ForgeEssentials или LuxinfineHelper. Адаптер `commands` выполняет консольные шаблоны из конфигурации. Выбор задаётся в `permissions.adapter`, значение `auto` обнаруживает доступный адаптер.
+
+На Bukkit баланс сайта доступен другим плагинам через Vault. На Forge 1.7.10 с LuxinfineHelper выберите интеграцию экономики `unicorecms` в его настройках.
+
+## Обновление и перенос
+
+При обновлении сохраняйте конфигурацию и каталог состояния: `plugins/UnicoreConnect/state` на Bukkit, `config/unicoreconnect` на Forge и NeoForge. В нём находятся сведения о сессиях и ожидающие отправки изменения. После восстановления связи они доставляются на сайт автоматически.
+
+На Bukkit состояние соединения можно посмотреть командой `/uc status` с правом `unicoreconnect.admin.sync`.
