@@ -3,5 +3,5 @@
   "title": "Начало работы",
   "description": "Установка, .env и первый запуск",
   "icon": "Rocket",
-  "pages": ["index", "install", "env", "first-run", "update"]
+  "pages": ["index", "install", "env", "first-run", "updater", "update"]
 }
