@@ -63,6 +63,8 @@ initializeTransactionalContext()
 
 Файл кладётся в `src/migrations/steps/<timestamp>-<имя>.migration.ts`, имя класса заканчивается тем же timestamp — по нему определяется порядок.
 
+В классе обязательно задайте поле `name` с полным именем и timestamp. Обфускатор меняет имя конструктора; без этого поля TypeORM остановит запуск с ошибкой `migration name is wrong`. В версии 1.3.2 исправлено такое поле у `WebRoleOrigins1757080000000`.
+
 ```ts
 export class RenameSlogan1756000000000 implements MigrationInterface {
   name = 'RenameSlogan1756000000000';
@@ -79,6 +81,14 @@ export class RenameSlogan1756000000000 implements MigrationInterface {
   public async down(): Promise<void> {}
 }
 ```
+
+Проверьте имена всех миграций после обфускации:
+
+```bash
+pnpm --filter unicore-server exec node --test test/migration-obfuscation.test.mjs
+```
+
+Тест использует настройки обфускатора из серверной сборки и проверяет загрузку миграций через TypeORM. Подключение к базе не требуется. Эта проверка также выполняется в CI при сборке и выпуске релиза.
 
 Два правила, которые экономят ночи:
 
