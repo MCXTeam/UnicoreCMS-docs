@@ -6,6 +6,7 @@
   "pages": [
     "index",
     "install",
+    "licensing",
     "module",
     "ui",
     "admin-forms",

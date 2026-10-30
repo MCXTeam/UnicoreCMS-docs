@@ -27,6 +27,12 @@ import { defineAdminModule } from 'unicore-api/admin'
 объявить `unicoreApi: "^1.15.0"`. Пример подключения находится в
 [документации форм админки](/docs/extensions/admin-forms).
 
+В ветке разработки API 1.16 добавляет лицензирование платных модулей и тем,
+контракт `commercial` и проверки `LicensedModule`, `assertModuleLicense`,
+`requireModuleLicense`. Условия запуска и требования к сборке описаны в
+[лицензировании расширений](/docs/extensions/licensing). Это изменение ещё не
+входит в опубликованную CMS 1.3.2.
+
 ## Фасады
 
 Всё, что ядро отдаёт модулю, доступно через `core()`.
